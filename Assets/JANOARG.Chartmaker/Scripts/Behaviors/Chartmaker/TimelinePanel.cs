@@ -395,6 +395,8 @@ namespace JANOARG.Chartmaker.Behaviors.Chartmaker
             return item;
         }
 
+        private List<float> Times = new();
+
         public void UpdateItems()
         {
             if (TimelineHeight <= 0) 
@@ -404,8 +406,9 @@ namespace JANOARG.Chartmaker.Behaviors.Chartmaker
             Metronome metronome = Chartmaker.main.CurrentSong.Timing;
         
             float density = (PeekRange.y - PeekRange.x) / TicksHolder.rect.width;
-            List<float> times = new();
-
+            ;
+            
+            Times.Clear();
             Blocker.SetActive(false);
 
             TimelineItem AddItem(object obj, float time)
@@ -426,13 +429,13 @@ namespace JANOARG.Chartmaker.Behaviors.Chartmaker
                 int pos;
                 size *= density;
 
-                for (pos = 0; pos < times.Count; pos++)
-                    if (times[pos] < time - size) break;
+                for (pos = 0; pos < Times.Count; pos++)
+                    if (Times[pos] < time - size) break;
 
-                if (pos < times.Count) 
-                    times[pos] = time;
+                if (pos < Times.Count) 
+                    Times[pos] = time;
                 else
-                    times.Add(time);
+                    Times.Add(time);
 
                 return pos;
             }
@@ -476,7 +479,7 @@ namespace JANOARG.Chartmaker.Behaviors.Chartmaker
                     for (int a = 0; a < types.Length; a++)
                     {
                         int index = a - ScrollOffset;
-                        times.Add(0);
+                        Times.Add(0);
                         if (index >= 0 && a - ScrollOffset < TimelineHeight)
                         {
                             TMP_Text label = GetStoryboardEntry(index);
@@ -633,7 +636,7 @@ namespace JANOARG.Chartmaker.Behaviors.Chartmaker
                         float timeEndPoint = metronome.ToSeconds(lane.LaneSteps[^1].Offset);
 
                         int zPosition = AddTime(time, 24) - ScrollOffset;
-                        times[zPosition + ScrollOffset] = Mathf.Max(time, timeEndPoint - 7 * density);
+                        Times[zPosition + ScrollOffset] = Mathf.Max(time, timeEndPoint - 7 * density);
 
                         if (zPosition < -1 || zPosition >= TimelineHeight + 1) continue;
                         if (timeEndPoint < PeekRange.x - dOffset || time > PeekRange.y + dOffset) continue;
@@ -797,9 +800,9 @@ namespace JANOARG.Chartmaker.Behaviors.Chartmaker
                 StoryboardEntries.RemoveAt(StoryboardEntries.Count - 1);
             }
         
-            if (ItemHeight != times.Count)
+            if (ItemHeight != Times.Count)
             {
-                ItemHeight = times.Count;
+                ItemHeight = Times.Count;
                 UpdateScrollbar();
             }
 
@@ -858,6 +861,7 @@ namespace JANOARG.Chartmaker.Behaviors.Chartmaker
         float  waveTime, waveLastDensity = 0;
         bool   waveTimeouted             = false;
         bool[] waveBaked;
+        private System.Diagnostics.Stopwatch sw = System.Diagnostics.Stopwatch.StartNew();
 
         public void UpdateWaveform()
         {
@@ -927,8 +931,8 @@ namespace JANOARG.Chartmaker.Behaviors.Chartmaker
 
             WaveformImage.uvRect = new Rect(waveOffset / (float)texture.width, 0, 1, 1);
 
-            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-            bool Timeout() => stopwatch.ElapsedMilliseconds >= 15;
+            sw.Reset();
+            bool Timeout() => sw.ElapsedMilliseconds >= 15;
             waveTimeouted = false;
 
             switch (Options.WaveformMode) 

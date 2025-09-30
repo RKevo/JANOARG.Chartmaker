@@ -74,7 +74,8 @@ namespace JANOARG.Chartmaker.Behaviors.Chartmaker
             barPos = Chartmaker.main.CurrentSong.Timing.ToDividedBeat(sec);
 
 
-            StartCoroutine(UpdateTimeLabel());
+            SecondTimeLabel.text = Mathf.Floor(sec / 60).ToString("00") + ":" + Mathf.Floor(sec % 60).ToString("00") + "s" + Mathf.Floor(sec * 1000 % 1000).ToString("000");
+            BeatTimeLabel.text = beat.ToString("0.000").Replace('.', 'b');
 
             if (!TimelinePanel.main.isDragged && PlayOptions.MetronomeVolume > 0 && Mathf.Floor(beat) > MetronomeIndex)
                 SoundPlayer.PlayOneShot(barPos < 1 ? MetronomeSoundMain : MetronomeSoundSub, PlayOptions.MetronomeVolume);
@@ -82,14 +83,6 @@ namespace JANOARG.Chartmaker.Behaviors.Chartmaker
             MetronomeIndex = Mathf.Floor(beat);
 
             UpdateVisualizer();
-        }
-
-        private IEnumerator UpdateTimeLabel()
-        {
-            SecondTimeLabel.text = Mathf.Floor(sec / 60).ToString("00") + ":" + Mathf.Floor(sec % 60).ToString("00") + "s" + Mathf.Floor(sec * 1000 % 1000).ToString("000");
-            BeatTimeLabel.text = beat.ToString("0.000").Replace('.', 'b');
-
-            yield return null;
         }
 
         public void UpdateButtonActivity() 
