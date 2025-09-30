@@ -6,7 +6,6 @@ using JANOARG.Chartmaker.UI.Form.FormTypes;
 using JANOARG.Chartmaker.UI.NativeUI;
 using JANOARG.Chartmaker.UI.Themeable;
 using JANOARG.Chartmaker.UI.Tooltip;
-using JANOARG.Chartmaker.UI.Cursor;
 using JANOARG.Chartmaker.Utils;
 using UnityEngine;
 using UnityEngine.UI;
