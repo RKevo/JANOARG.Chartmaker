@@ -5,7 +5,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,7 +17,6 @@ using JANOARG.Chartmaker.Utils;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using Random = UnityEngine.Random;
 
 namespace JANOARG.Chartmaker.UI.Modal.ModalTypes
 {
@@ -582,8 +580,6 @@ namespace JANOARG.Chartmaker.UI.Modal.ModalTypes
                 encoderField.gameObject.SetActive(false);
                 
             }
-
-
 
             SpawnForm<FormEntryHeader>("Time");
             var timeField = SpawnForm<FormEntryTimeRange, Vector2>("Range (sec)", () => TimeRange, x =>
