@@ -852,6 +852,7 @@ namespace JANOARG.Chartmaker.UI.Modal.ModalTypes
         private string _EtaString;
 
         private Queue<float> _RecentFrameTimes;
+        private Stopwatch sw = new Stopwatch();
         public async Task RenderRoutine()
         {
             IsAnimating = true;
@@ -1037,6 +1038,9 @@ namespace JANOARG.Chartmaker.UI.Modal.ModalTypes
                 int maxFrameCount = (int)(framebufferLimit / frameBufferSize);
                 int resumeFrameCount = maxFrameCount * 3 / 4;
 
+                sw.Reset();
+                sw.Start();
+                UnityEngine.Debug.Log($"Start measuring: {sw.Elapsed}");
                 // Main rendering loop
                 while (time < timeRange.y && frameIndex < totalFrames)
                 {
@@ -1158,6 +1162,9 @@ namespace JANOARG.Chartmaker.UI.Modal.ModalTypes
                     }
                 }
                 QualitySettings.antiAliasing = originalAntiAliasing;
+                
+                sw.Stop();
+                UnityEngine.Debug.Log($"Measurement ended: {sw.Elapsed}");
 
                 Close();
                 chartmaker.Notify("Render completed!");
