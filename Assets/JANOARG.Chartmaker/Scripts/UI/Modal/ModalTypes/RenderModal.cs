@@ -1001,21 +1001,19 @@ namespace JANOARG.Chartmaker.UI.Modal.ModalTypes
                 bool rendering = true;
                 bool brokenPipe = false;
                 Exception pipeError = null;
-                long framebufferLimit = 2_000_000_000;
+                long framebufferLimit = 1920*1080*3*322; // ~ 2003.576 mb
                 if (SystemInfo.systemMemorySize > 0) framebufferLimit = Math.Min(
                     framebufferLimit,
                     SystemInfo.systemMemorySize * 1_048_576L // 20% of system's memory
                 );
                 
                 // Pre-allocate buffer for raw frame data
-                int frameSize = resolution.x * resolution.y * 3; // RGB24 = 3 bytes per pixel
-                byte[] frameBuffer = new byte[frameSize];
-                int frameBufferSize = frameBuffer.Length;
+                int frameBufferSize = resolution.x * resolution.y * 3; // RGB24 = 3 bytes per pixel
 
                 // Pre-calculate thresholds
                 int maxFrameCount = (int)(framebufferLimit / frameBufferSize);
                 int resumeFrameCount = maxFrameCount * 3 / 4;
-                pool = new FixedSizeBufferPool(frameBufferSize, 8);
+                pool = new FixedSizeBufferPool(frameBufferSize, 16, maxFrameCount);
 #region StdIn
                 var pipingThread = new Thread(() =>
                 {
@@ -1027,8 +1025,8 @@ namespace JANOARG.Chartmaker.UI.Modal.ModalTypes
                             {
                                 ffmpegInputStream.Write(frame.AsSpan());
                                 ffmpegInputStream.Flush();
-                                framePipedIndex++;
                                 pool.Return(frame);
+                                framePipedIndex++;
                             }
                             catch (Exception e)
                             {
@@ -1057,6 +1055,7 @@ namespace JANOARG.Chartmaker.UI.Modal.ModalTypes
                 // Main rendering loop
                 while (time < timeRange.y && frameIndex < totalFrames)
                 {
+                    // todo: what?
                     if (frameQueue.Count >= maxFrameCount)
                     {
                         while (frameQueue.Count >= resumeFrameCount)
@@ -1088,8 +1087,14 @@ namespace JANOARG.Chartmaker.UI.Modal.ModalTypes
                     // Get raw RGB data directly, without copying
                     // Should be fine because we're using it 'immediately' i.e not across an await
                     NativeArray<byte> rawData = tex.GetRawTextureData<byte>();
-                    var entry = pool.Rent();
-                    entry.CopyFrom(rawData);
+                    
+                    if (pool.Rent(out var entry))
+                    {
+                        entry.CopyFrom(rawData);
+                        frameQueue.Enqueue(entry);
+                    } else {
+                        await Task.Yield();
+                    }
 
                     if (FFmpegProcess.HasExited)
                     {
@@ -1097,7 +1102,6 @@ namespace JANOARG.Chartmaker.UI.Modal.ModalTypes
                         throw new Exception("FFmpeg process ended prematurely. Your copy of FFmpeg might not support the selected encoders.");
                     }
 
-                    frameQueue.Enqueue(entry);
 #endregion
                     frameIndex++;
                     frameYieldIndex++;
@@ -1166,7 +1170,7 @@ namespace JANOARG.Chartmaker.UI.Modal.ModalTypes
                 
                 sw.Stop();
                 UnityEngine.Debug.Log($"Config: {resolution.x}x{resolution.y}@{frameRate} {Prefs.VideoBitRate}kbit/sec");
-                UnityEngine.Debug.Log($"Measurement ended (nat): {sw.Elapsed}");
+                    UnityEngine.Debug.Log($"Measurement ended (nat): {sw.Elapsed}");
                 
                 
                 QualitySettings.antiAliasing = originalAntiAliasing;

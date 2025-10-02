@@ -23,12 +23,12 @@ namespace JANOARG.Chartmaker.Utils.Memory
         private readonly int size;
         private int _disposed;
         private int alloced;
+        private int max_alloc;
 
-
-        public FixedSizeBufferPool(int arraySize, uint reserve = 4) // try 8?
+        public FixedSizeBufferPool(int arraySize, int reserve = 4, int max = 64) // try 8?
         {
             size = arraySize;
-            alloced += (int)reserve;
+            alloced += reserve;
             for (int i = 0; i < reserve; i++)
             {
                 var _ref = new buf(size, Allocator.Persistent);
@@ -40,24 +40,32 @@ namespace JANOARG.Chartmaker.Utils.Memory
         /// Return after renting to avoid leaks.
         /// </remarks>
         /// <returns>Wrapper over a <see cref="NativeArray{T}"/> </returns>
-        public FixedSizeEntry Rent()
+        public bool Rent(out FixedSizeEntry rental)
         {
             if (backing.TryTake(out var item))
             {
-                return new FixedSizeEntry()
+                rental = new FixedSizeEntry()
                 {
                     _ref = item,
                     _cachedSize = size
                 };
+                return true;
+            }
+
+            if (alloced == max_alloc)
+            {
+                rental = new FixedSizeEntry();
+                return false;
             }
 
             var new_buf = new buf(size, Allocator.Persistent);
             Interlocked.Add(ref alloced, 1);
-            return new FixedSizeEntry()
+            rental = new FixedSizeEntry()
             {
                 _ref = new_buf,
                 _cachedSize = size
             };
+            return true;
         }
 
         /// 
