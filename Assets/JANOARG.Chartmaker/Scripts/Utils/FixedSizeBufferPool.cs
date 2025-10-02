@@ -22,11 +22,13 @@ namespace JANOARG.Chartmaker.Utils.Memory
   
         private readonly int size;
         private int _disposed;
+        private int alloced;
 
 
         public FixedSizeBufferPool(int arraySize, uint reserve = 4) // try 8?
         {
             size = arraySize;
+            alloced += (int)reserve;
             for (int i = 0; i < reserve; i++)
             {
                 var _ref = new buf(size, Allocator.Persistent);
@@ -50,7 +52,7 @@ namespace JANOARG.Chartmaker.Utils.Memory
             }
 
             var new_buf = new buf(size, Allocator.Persistent);
-
+            Interlocked.Add(ref alloced, 1);
             return new FixedSizeEntry()
             {
                 _ref = new_buf,
@@ -132,18 +134,14 @@ namespace JANOARG.Chartmaker.Utils.Memory
             {
                 var present = new HashSet<int>();
                 UnityEngine.Debug.Log($"Capacity: {backing.Count}");
+                UnityEngine.Debug.Log($"Allocated: {alloced}");
+                if (backing.Count != alloced)
+                {
+                    UnityEngine.Debug.LogWarning($"Possible multiple returns of attempted in this pool.");  
+                }
                 foreach (var each in backing)
                 {
-                    var hash = each.GetHashCode();
-                    if (!present.Contains(hash))
-                    {
-                        present.Add(hash);
-                        each.Dispose();
-                    }
-                    else
-                    {
-                        UnityEngine.Debug.LogWarning($"Possible multiple returns of {hash} attempted in this pool.");  
-                    }
+                    each.Dispose();
                 }
 
                 if (disposing)
