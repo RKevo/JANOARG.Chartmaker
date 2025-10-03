@@ -1093,7 +1093,7 @@ namespace JANOARG.Chartmaker.UI.Modal.ModalTypes
                         entry.CopyFrom(rawData);
                         frameQueue.Enqueue(entry);
                     } else {
-                        await Task.Yield();
+                        continue;
                     }
 
                     if (FFmpegProcess.HasExited)
