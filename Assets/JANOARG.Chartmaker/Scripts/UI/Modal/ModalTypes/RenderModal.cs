@@ -1161,7 +1161,7 @@ namespace JANOARG.Chartmaker.UI.Modal.ModalTypes
 
                 sw.Stop();
                 UnityEngine.Debug.Log($"Config: {resolution.x}x{resolution.y}@{frameRate} {Prefs.VideoBitRate}kbit/sec");
-                UnityEngine.Debug.Log($"Measurement ended (nat): {sw.Elapsed}");
+                UnityEngine.Debug.Log($"Measurement ended (prev): {sw.Elapsed}");
 
                 Close();
                 chartmaker.Notify("Render completed!");
