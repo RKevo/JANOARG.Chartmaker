@@ -1058,6 +1058,7 @@ namespace JANOARG.Chartmaker.UI.Modal.ModalTypes
 
                 pipingThread.Start();
                 #endregion
+                var _readbackQueue = new Queue<(AsyncGPUReadbackRequest, entry)>(16);
                 sw.Start();
                 UnityEngine.Debug.Log($"Start measuring: {sw.Elapsed}");
                 // Main rendering loop
@@ -1080,23 +1081,28 @@ namespace JANOARG.Chartmaker.UI.Modal.ModalTypes
                     }
                     #region HotPath
                     // Update scene
-
+                    while (_readbackQueue.TryPeek(out var result))
+                    {
+                        if (result.Item1.done)
+                        {
+                            var frame = _readbackQueue.Dequeue().Item2;
+                            frameQueue.Enqueue(frame);
+                            continue;
+                        }
+                        break;
+                    }
+                    
                     if (pool.Rent(out var entry))
                     {
                         songSource.time = Mathf.Clamp(time, 0f, songSource.clip.length);
                         informationBar.Update();
                         playerView.UpdateObjects();
                         time += delta;
-
                         // Render frame
                         RenderTexture.active = rtex;
                         _Camera.Render();
-                        var req = AsyncGPUReadback.RequestIntoNativeArray<byte>(ref entry._ref, rtex, 0, TextureFormat.RGB24);
-                        while (!req.done)
-                        {
-                            await Task.Yield();
-                        }
-                        frameQueue.Enqueue(entry);
+                        var _req = AsyncGPUReadback.RequestIntoNativeArray<byte>(ref entry._ref, rtex, 0, TextureFormat.RGB24);
+                        _readbackQueue.Enqueue((_req, entry));
                     }
                     else
                     {
