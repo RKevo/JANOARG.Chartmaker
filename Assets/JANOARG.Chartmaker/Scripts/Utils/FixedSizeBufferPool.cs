@@ -18,8 +18,8 @@ namespace JANOARG.Chartmaker.Utils.Memory
     /// </summary>
     public sealed class FixedSizeBufferPool : IDisposable
     {
-        private ConcurrentBag<buf> backing = new();
-  
+        private ConcurrentBag<buf> backing;
+        private List<buf> references;
         private readonly int size;
         private int _disposed;
         private int alloced;
@@ -27,12 +27,16 @@ namespace JANOARG.Chartmaker.Utils.Memory
 
         public FixedSizeBufferPool(int arraySize, int reserve = 4, int max = 64) // try 8?
         {
+            backing = new();
             size = arraySize;
             alloced += reserve;
+            max_alloc = max;
+            references = new(max_alloc);
             for (int i = 0; i < reserve; i++)
             {
                 var _ref = new buf(size, Allocator.Persistent);
                 backing.Add(_ref);
+                references.Add(_ref);
             }
         }
 
@@ -60,6 +64,10 @@ namespace JANOARG.Chartmaker.Utils.Memory
 
             var new_buf = new buf(size, Allocator.Persistent);
             Interlocked.Add(ref alloced, 1);
+            lock (references)
+            {
+                references.Add(new_buf);
+            }
             rental = new FixedSizeEntry()
             {
                 _ref = new_buf,
@@ -83,10 +91,10 @@ namespace JANOARG.Chartmaker.Utils.Memory
 
         public struct FixedSizeEntry
         {
-            internal NativeArray<byte> _ref;
+            internal buf _ref;
             internal readonly int _cachedSize { init; get; }
 
-            public bool CopyFrom(NativeArray<byte> src)
+            public bool CopyFrom(buf src)
             {
                 if (src.Length != _cachedSize)
                 {
@@ -95,8 +103,8 @@ namespace JANOARG.Chartmaker.Utils.Memory
                 _ref.CopyFrom(src);
                 return true;
             }
-            
-            public bool CopyTo(NativeArray<byte> dst)
+
+            public bool CopyTo(buf dst)
             {
                 if (dst.Length != _cachedSize)
                 {
@@ -105,7 +113,7 @@ namespace JANOARG.Chartmaker.Utils.Memory
                 _ref.CopyTo(dst);
                 return true;
             }
-            
+
             public bool CopyFromU8(byte[] src)
             {
                 if (src.Length != _cachedSize)
@@ -115,7 +123,7 @@ namespace JANOARG.Chartmaker.Utils.Memory
                 _ref.CopyFrom(src);
                 return true;
             }
-            
+
             public bool CopyToU8(byte[] dst)
             {
                 if (dst.Length != _cachedSize)
@@ -129,7 +137,7 @@ namespace JANOARG.Chartmaker.Utils.Memory
             public ReadOnlySpan<byte> AsSpan() => _ref.AsReadOnlySpan();
 
         }
-        
+
         public void Dispose()
         {
             Dispose(true);
@@ -140,22 +148,14 @@ namespace JANOARG.Chartmaker.Utils.Memory
         {
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 0)
             {
-                var present = new HashSet<int>();
                 UnityEngine.Debug.Log($"Capacity: {backing.Count}");
                 UnityEngine.Debug.Log($"Allocated: {alloced}");
                 if (backing.Count != alloced)
-                {
-                    UnityEngine.Debug.LogWarning($"Possible multiple returns of attempted in this pool.");  
-                }
-                foreach (var each in backing)
-                {
-                    each.Dispose();
-                }
-
+                    UnityEngine.Debug.LogWarning($"Possible multiple returns of attempted in this pool.");
                 if (disposing)
-                {
                     backing = null;
-                }
+                foreach (var each in references)
+                    each.Dispose();
             }
         }
 
@@ -165,5 +165,5 @@ namespace JANOARG.Chartmaker.Utils.Memory
 
 namespace System.Runtime.CompilerServices
 {
-    internal static class IsExternalInit {}
+    internal static class IsExternalInit { }
 }
