@@ -37,7 +37,7 @@ namespace JANOARG.Chartmaker.Utils.Memory
             {
                 var _ref = new buf(size, Allocator.Persistent);
                 backing.Add(_ref);
-                references.AddRange(_ref);
+                references.Append(_ref);
             }
         }
 

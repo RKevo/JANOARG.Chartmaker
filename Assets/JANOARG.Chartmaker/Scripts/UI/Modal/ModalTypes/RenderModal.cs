@@ -1086,7 +1086,6 @@ namespace JANOARG.Chartmaker.UI.Modal.ModalTypes
                     // Render frame
                     RenderTexture.active = rtex;
                     _Camera.Render();
-                    ScreenCapture.CaptureScreenshotIntoRenderTexture(tex);
 
                     var entry = pool.Rent();
                     var req = AsyncGPUReadback.RequestIntoNativeArray<byte>(ref entry._ref, tex, 0, TextureFormat.RGB24);
