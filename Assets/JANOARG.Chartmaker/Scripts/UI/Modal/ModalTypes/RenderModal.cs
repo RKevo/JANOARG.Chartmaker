@@ -1091,7 +1091,7 @@ namespace JANOARG.Chartmaker.UI.Modal.ModalTypes
 
                     if (pool.Rent(out var entry))
                     {
-                        var req = AsyncGPUReadback.RequestIntoNativeArray<byte>(ref entry._ref, tex, 0, TextureFormat.RGB24);
+                        var req = AsyncGPUReadback.RequestIntoNativeArray<byte>(ref entry._ref, rtex, 0, TextureFormat.RGB24);
                         while (!req.done)
                         {
                             await Task.Yield();
