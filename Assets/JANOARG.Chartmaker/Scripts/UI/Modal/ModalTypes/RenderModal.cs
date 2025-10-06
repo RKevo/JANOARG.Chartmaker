@@ -1080,17 +1080,17 @@ namespace JANOARG.Chartmaker.UI.Modal.ModalTypes
                     }
                     #region HotPath
                     // Update scene
-                    songSource.time = Mathf.Clamp(time, 0f, songSource.clip.length);
-                    informationBar.Update();
-                    playerView.UpdateObjects();
-                    time += delta;
-
-                    // Render frame
-                    RenderTexture.active = rtex;
-                    _Camera.Render();
 
                     if (pool.Rent(out var entry))
                     {
+                        songSource.time = Mathf.Clamp(time, 0f, songSource.clip.length);
+                        informationBar.Update();
+                        playerView.UpdateObjects();
+                        time += delta;
+
+                        // Render frame
+                        RenderTexture.active = rtex;
+                        _Camera.Render();
                         var req = AsyncGPUReadback.RequestIntoNativeArray<byte>(ref entry._ref, rtex, 0, TextureFormat.RGB24);
                         while (!req.done)
                         {
