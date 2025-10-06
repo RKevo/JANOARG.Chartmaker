@@ -1088,7 +1088,7 @@ namespace JANOARG.Chartmaker.UI.Modal.ModalTypes
                     _Camera.Render();
 
                     var entry = pool.Rent();
-                    var req = AsyncGPUReadback.RequestIntoNativeArray<byte>(ref entry._ref, tex, 0, TextureFormat.RGB24);
+                    var req = AsyncGPUReadback.RequestIntoNativeArray<byte>(ref entry._ref, rtex, 0, TextureFormat.RGB24);
                     while (!req.done)
                     {
                         await Task.Yield();
