@@ -811,9 +811,9 @@ namespace JANOARG.Chartmaker.Behaviors.Chartmaker
 
                     Func<Vector3> get = CurrentDragMode switch
                     {
-                        HandleDragMode.Start => (() => Vector3.right * hitObjectManager.CurrentHit.Position),
-                        HandleDragMode.Center => (() => Vector3.right * (hitObjectManager.CurrentHit.Position + hitObjectManager.CurrentHit.Length / 2)),
-                        HandleDragMode.End => (() => Vector3.right * (hitObjectManager.CurrentHit.Position + hitObjectManager.CurrentHit.Length)),
+                        HandleDragMode.Start => (() => Vector3.right * hitObjectManager.Current.Position),
+                        HandleDragMode.Center => (() => Vector3.right * (hitObjectManager.Current.Position + hitObjectManager.Current.Length / 2)),
+                        HandleDragMode.End => (() => Vector3.right * (hitObjectManager.Current.Position + hitObjectManager.Current.Length)),
                         _ => null
                     };
                     
