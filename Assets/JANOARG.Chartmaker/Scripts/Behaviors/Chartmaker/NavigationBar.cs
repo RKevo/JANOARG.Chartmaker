@@ -133,8 +133,14 @@ namespace JANOARG.Chartmaker.Behaviors.Chartmaker
         {
             return new ContextMenuList(
                 new ContextMenuListSublist("Show", 
-                    new ContextMenuListAction("Hierarchy Panel", () => {
-                        if (HierarchyPanel.main.IsCollapsed) 
+                    new ContextMenuListAction("Maximized Player View", () =>
+                    {
+                        PlayerView.main.IsMaximised = !PlayerView.main.IsMaximised;
+                    }, _checked: PlayerView.main.IsMaximised),
+                    new ContextMenuListSeparator(),
+                    new ContextMenuListAction("Hierarchy Panel", () =>
+                    {
+                        if (HierarchyPanel.main.IsCollapsed)
                             HierarchyPanel.main.Restore();
                         else
                             HierarchyPanel.main.Collapse();

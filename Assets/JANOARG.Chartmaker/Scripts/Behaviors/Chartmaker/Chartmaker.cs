@@ -578,15 +578,15 @@ namespace JANOARG.Chartmaker.Behaviors.Chartmaker
             Lane       =>       "Lane",
             LaneStep   =>       "Lane Step",
             HitObject  =>       "Hit Object",
-            _          =>       item.ToString()
+            _          =>       item?.ToString().Split(".")[^1] ?? "Null"
         };
 
         public void OnHistoryDo()
         {
-            InspectorPanel.main?.UpdateForm();
-            TimelinePanel.main?.UpdateItems();
-            PlayerView.main?.UpdateObjects();
-            HierarchyPanel.main?.UpdateHierarchy();
+            InspectorPanel.main.UpdateForm();
+            TimelinePanel.main.UpdateItems();
+            PlayerView.main.UpdateObjects();
+            HierarchyPanel.main.UpdateHierarchy();
             IsDirty = true;
         }
 
@@ -625,9 +625,11 @@ namespace JANOARG.Chartmaker.Behaviors.Chartmaker
                 return;
         
             History.SetItem(target, field, value);
-        
-            if (field == "Offset") 
+
+            if (field == "Offset")
                 SortList(GetListTarget(target));
+            if (target is Timestamp)
+                ((Storyboardable)InspectorPanel.main.CurrentObject).Storyboard.InvalidateCache();
         
             TimelinePanel.main.UpdateItems();
             PlayerView.main.UpdateObjects();
@@ -639,7 +641,7 @@ namespace JANOARG.Chartmaker.Behaviors.Chartmaker
 
         public IList GetListTarget(object obj) => obj switch {
             IList list  => list.Count > 0 ? GetListTarget(list[0]) : throw new ArgumentException("Can't determine list target of an empty list"),
-            Timestamp   => ((Storyboardable)InspectorPanel.main.CurrentObject).Storyboard.Timestamps,
+            Timestamp   => (IList)((Storyboardable)InspectorPanel.main.CurrentObject).Storyboard,
             BPMStop     => CurrentSong.Timing.Stops,
             LaneStyle   => CurrentChart.Palette.LaneStyles,
             HitStyle    => CurrentChart.Palette.HitStyles,
@@ -731,11 +733,11 @@ namespace JANOARG.Chartmaker.Behaviors.Chartmaker
             if (list[0] is BPMStop firstBpmStop)
             {
                 float minOffset = float.PositiveInfinity;
-            
+
                 foreach (object item in list)
                 {
                     BPMStop stop = (BPMStop)item;
-                    stop.Offset += Mathf.Min(minOffset, stop.Offset);
+                    minOffset = Mathf.Min(minOffset, stop.Offset);
                 }
 
                 float offset = startingOffset - minOffset;
@@ -751,7 +753,7 @@ namespace JANOARG.Chartmaker.Behaviors.Chartmaker
         {
             IList list = obj is IList listObject 
                 ? listObject : new [] { obj };
-        
+
             FieldInfo field = list[0].GetType().GetField("Offset");
         
             if (list[0] is Lane firstLane)
@@ -789,6 +791,9 @@ namespace JANOARG.Chartmaker.Behaviors.Chartmaker
                 }
 
                 BeatPosition offset = startingOffset - minOffset;
+
+                UnityEngine.Debug.Log(startingOffset + " " + minOffset + " " + offset);
+
                 foreach (object item in list)
                 {
                     field.SetValue(item, (BeatPosition)field.GetValue(item) + offset);

@@ -6,6 +6,8 @@ using JANOARG.Chartmaker.Data.Chartmaker.Actions;
 using JANOARG.Chartmaker.UI;
 using JANOARG.Chartmaker.UI.ContextMenu;
 using JANOARG.Chartmaker.UI.Cursor;
+using JANOARG.Chartmaker.UI.Modal;
+using JANOARG.Chartmaker.UI.Modal.ModalTypes;
 using JANOARG.Chartmaker.UI.NativeUI;
 using JANOARG.Shared.Data.ChartInfo;
 using JANOARG.Chartmaker.Utils;
@@ -25,6 +27,9 @@ namespace JANOARG.Chartmaker.Behaviors.Chartmaker
         public bool IsCollapsed;
         public HierarchyMode CurrentMode;
         public RectTransform PanelHolder;
+        [Space]
+        public Button HierarchyTabButton;
+        public Button CollapserButton;
         [Space]
         public Sprite[] Icons;
         [Space]
@@ -333,22 +338,136 @@ namespace JANOARG.Chartmaker.Behaviors.Chartmaker
         {
             foreach (var holder in Holders)
             {
-                holder.SelectedBackground.SetActive(
-                    holder.Target.Target != null && (
-                        InspectorPanel.main.CurrentHierarchyObject is IList list && list.Contains(holder.Target.Target)
-                        || holder.Target.Target == InspectorPanel.main.CurrentHierarchyObject
-                    )
-                );
+                bool hasTarget       = holder.Target.Target != null;
+                bool isInList        = InspectorPanel.main.CurrentHierarchyObject is IList list && list.Contains(holder.Target.Target);
+                bool isDirectMatch   = holder.Target.Target == InspectorPanel.main.CurrentHierarchyObject;
+
+                holder.SelectedBackground.SetActive(hasTarget && (isInList || isDirectMatch));;
             }
         }
+
+        private float         lastClickTime        = 0f;
+        private float         doubleClickThreshold = 0.3f; // 300ms threshold
+        private HierarchyItem lastClickedItem      = null;
 
         public void Select(HierarchyItem item) 
         {
             if (isDragging) return;
+
+            float timeSinceLastClick = Time.unscaledTime - lastClickTime;
+    
+            // Check if it's a double-click on the same item
+            if (timeSinceLastClick <= doubleClickThreshold && lastClickedItem == item)
+            {
+                OnDoubleClick(item);
+                lastClickTime = 0f; // Reset to prevent triple-click registering as another double-click
+                lastClickedItem = null;
+            }
+            else
+            {
+                // Single click
+                if (item.Target != null) InspectorPanel.main.SetObject(item.Target);
         
-            if (item.Target != null) InspectorPanel.main.SetObject(item.Target);
+                lastClickTime = Time.unscaledTime;
+                lastClickedItem = item;
+            }
         }
 
+        private void OnDoubleClick(HierarchyItem item)
+        {
+            UnityEngine.Debug.Log("Double Click " + item.Target);
+
+            float? targetTime = null;
+            object targetObject = null;
+
+            switch (item.Target)
+            {
+                case Lane lane when lane.LaneSteps == null || lane.LaneSteps.Count == 0:
+                    UnityEngine.Debug.LogWarning($"Lane {lane.Name} has no steps to seek to");
+                    return;
+                
+                case Lane lane:
+                    targetTime = Chartmaker.main.CurrentSong.Timing.ToSeconds(lane.LaneSteps[0].Offset);
+                    targetObject = item.Target;
+
+                    break;
+                
+                case LaneGroup group:
+                {
+                    Lane[] lanes = Chartmaker.main.CurrentChart.Lanes.FindAll(qLane => qLane.Group == group.Name).ToArray();
+                    float lowestSec = float.MaxValue;
+                    Lane candidateLane = null;
+                
+                    foreach (Lane childLane in lanes)
+                    {
+                        if (childLane.LaneSteps == null || childLane.LaneSteps.Count == 0)
+                            continue;
+                        float head = Chartmaker.main.CurrentSong.Timing.ToSeconds(childLane.LaneSteps[0].Offset);
+
+                        if (!(head < lowestSec)) 
+                            continue;
+
+                        lowestSec = head;
+                        candidateLane = childLane;
+                    }
+                
+                    if (candidateLane == null)
+                    {
+                        UnityEngine.Debug.LogWarning($"LaneGroup {group.Name} has no valid lanes to seek to");
+                        return;
+                    }
+                
+                    targetTime = lowestSec;
+                    targetObject = candidateLane;
+
+                    break;
+                }
+            }
+
+            // Common seeking logic
+            if (targetTime.HasValue)
+            {
+                SeekToTime(targetTime.Value, targetObject);
+            }
+        }
+
+        private void SeekToTime(float time, object inspectorTarget)
+        {
+            Chartmaker.main.SongSource.time = Mathf.Clamp(time, 0, Chartmaker.main.SongSource.clip.length);
+    
+            if (Chartmaker.main.SongSource.time == 0 && !Chartmaker.main.SongSource.isPlaying)
+            {
+                Chartmaker.main.SongSource.Play();
+                Chartmaker.main.SongSource.Pause();
+            }
+
+            InspectorPanel.main.SetObject(inspectorTarget);
+    
+            float viewWidth = TimelinePanel.main.PeekRange.y - TimelinePanel.main.PeekRange.x;
+            float newStart = time - (viewWidth / 2f);
+            float offset = newStart - TimelinePanel.main.PeekRange.x;
+            offset = Mathf.Clamp(
+                offset,
+                TimelinePanel.main.PeekLimit.x - TimelinePanel.main.PeekRange.x,
+                TimelinePanel.main.PeekLimit.y - TimelinePanel.main.PeekRange.y
+            );
+
+            TimelinePanel.main.PeekRange.x += offset;
+            TimelinePanel.main.PeekRange.y += offset;
+            TimelinePanel.main.UpdateTimeline(true);
+    
+            // Force update on next frame
+            StartCoroutine(UpdatePlayerViewNextFrame());
+    
+            UnityEngine.Debug.Log($"Seeked to {time:F2}s");
+        }
+
+        private IEnumerator UpdatePlayerViewNextFrame()
+        {
+            yield return null; // Wait one frame
+            PlayerView.main.Update();
+        }
+        
         public void SelectAdjacent(int direction)
         {
             if (isDragging) return;
@@ -370,8 +489,13 @@ namespace JANOARG.Chartmaker.Behaviors.Chartmaker
         {
             static string KeyOf(string id) => KeyboardHandler.main.Keybindings[id].Keybind.ToString();
 
+            UnityEngine.Debug.Log("Right Click Select " + item.Target + " " + holder.Target);;;
+            
+            ContextMenuListSublist addHierarchyList = new ContextMenuListSublist("New", GetItems(item.Target));
+            
             InspectorPanel.main.SetObject(item.Target);
             ContextMenuHolder.main.OpenRoot(new ContextMenuList(
+                addHierarchyList,
                 new ContextMenuListAction("Cut", Chartmaker.main.Cut, KeyOf("ED:Cut"), 
                     icon: "Cut", _enabled: Chartmaker.main.CanCopy()),
                 new ContextMenuListAction("Copy", Chartmaker.main.Copy, KeyOf("ED:Copy"), 
@@ -387,6 +511,135 @@ namespace JANOARG.Chartmaker.Behaviors.Chartmaker
                 new ContextMenuListAction("Expand Recursively", () => {ExpandRecursively(item); UpdateHolders(); },
                     _enabled: item.Children.Count > 0)
             ), (RectTransform)holder.transform, ContextMenuDirection.Cursor);
+
+            ContextMenuListItem[] GetItems(object itemType)
+            {
+                Chart chart = Chartmaker.main.CurrentChart;
+                PlayableSong song = Chartmaker.main.CurrentSong;
+                switch (itemType)
+                {
+                    case LaneStyle:
+                    case HitStyle:
+                    case Palette:
+                        return new ContextMenuListItem[]
+                        {
+                            new ContextMenuListAction("Lane Style", () =>
+                            {
+                                LaneStyle target;
+
+                                if (chart.Palette.LaneStyles.Count > 0)
+                                    target = chart.Palette.LaneStyles[0];
+                                else
+                                    target = new LaneStyle()
+                                    {
+                                        LaneColor = song.InterfaceColor * new Color(1, 1, 1, .35f),
+                                        JudgeColor = song.InterfaceColor,
+                                    };
+
+                                target = InspectorPanel.main.CurrentObject switch
+                                {
+                                    LaneStyle laneStyle => laneStyle,
+                                    _ => target
+                                };
+
+                                Chartmaker.main.AddItem(target.DeepClone());
+                            }),
+                            
+                            new ContextMenuListAction("Hit Style", () =>
+                            {
+                                HitStyle target;
+
+                                if (chart.Palette.HitStyles.Count > 0)
+                                    target = chart.Palette.HitStyles[0];
+                                else
+                                    target = new HitStyle()
+                                    {
+                                        NormalColor = song.InterfaceColor,
+                                        CatchColor = Color.Lerp(song.InterfaceColor, song.BackgroundColor, .35f),
+                                        HoldTailColor = song.InterfaceColor * new Color(1, 1, 1, .35f),
+                                    };
+
+                                target = InspectorPanel.main.CurrentObject switch
+                                {
+                                    HitStyle hitStyle => hitStyle,
+                                    _ => target
+                                };
+
+                                Chartmaker.main.AddItem(target.DeepClone());
+                            }),
+                        };
+                    
+                    case PlayableSong:
+                    case Cover:
+                        return new ContextMenuListItem[]
+                        {
+                            new ContextMenuListAction("Cover Layer", () => ModalHolder.main.Spawn<NewCoverLayerModal>()),
+                        };
+                    
+                    case HierarchyItemType.World:
+                    case Lane:
+                    case LaneGroup:
+                        return new ContextMenuListItem[]
+                        {
+                            new ContextMenuListAction("Lane", () =>
+                            {
+                                string group = InspectorPanel.main.CurrentObject switch
+                                {
+                                    Lane laneCurrentObject => laneCurrentObject.Group,
+                                    LaneGroup laneGroupCurrentObject => laneGroupCurrentObject.Group,
+                                    _ => ""
+                                };
+
+                                Lane lane = new Lane
+                                {
+                                    Position = new(0, -4, 0),
+                                    Group = group,
+                                };
+
+                                lane.LaneSteps.Add(new LaneStep
+                                {
+                                    StartPointPosition = new(-8, 0),
+                                    EndPointPosition = new(8, 0),
+                                    Offset = (BeatPosition)InformationBar.main.beat
+                                });
+
+                                lane.LaneSteps.Add(new LaneStep
+                                {
+                                    StartPointPosition = new(-8, 0),
+                                    EndPointPosition = new(8, 0),
+                                    Offset = (BeatPosition)(InformationBar.main.beat + 1),
+                                });
+
+                                Chartmaker.main.AddItem(lane);
+                            }),
+                            new ContextMenuListAction("Lane Group", () =>
+                            {
+                                string parent = InspectorPanel.main.CurrentObject switch
+                                {
+                                    Lane laneCurrentObject => laneCurrentObject.Group,
+                                    LaneGroup laneGroupCurrentObject => laneGroupCurrentObject.Group,
+                                    _ => ""
+                                };
+
+                                LaneGroup group = new LaneGroup {
+                                    Group = parent,
+                                    Name = InspectorPanel.main.GetNewGroupName("Group 1"),
+                                };
+                                Chartmaker.main.AddItem(group);
+                            }),
+                        };
+                    
+                    case HierarchyItemType.Chart:
+                    case HierarchyItemType.Camera:
+                    default:
+                        return new ContextMenuListItem[]
+                        {
+                            new ContextMenuListAction("None...", () => { }, _enabled:false)
+                        };
+                }
+
+                return null;
+            }
         }
 
         public void RenameCurrent() 
@@ -439,10 +692,10 @@ namespace JANOARG.Chartmaker.Behaviors.Chartmaker
     
         public void ResizeHierarchy(float width, bool snap = true)
         {
-            if (snap) width = width < 142 ? 42 : 242;
-            else width = Mathf.Clamp(Mathf.Floor(width), 42, 242);
+            if (snap) width = width < 168 ? 69 : 268;
+            else width = Mathf.Clamp(Mathf.Floor(width), 69, 268);
 
-            PanelHolder.anchoredPosition = new(width - 200, PanelHolder.anchoredPosition.y);
+            PanelHolder.anchoredPosition = new(width - 226, PanelHolder.anchoredPosition.y);
             Chartmaker.main.PlayerViewHolder.anchoredPosition = new(
                 width, 
                 Chartmaker.main.PlayerViewHolder.anchoredPosition.y
@@ -455,9 +708,11 @@ namespace JANOARG.Chartmaker.Behaviors.Chartmaker
             PlayerView.main.Update();
             PlayerView.main.UpdateObjects();
 
-            if (snap) 
+            if (snap)
             {
-                IsCollapsed = width < 141;
+                IsCollapsed = width < 168;
+                HierarchyTabButton.interactable = IsCollapsed;
+                CollapserButton.gameObject.SetActive(!IsCollapsed);
             }
         }
     

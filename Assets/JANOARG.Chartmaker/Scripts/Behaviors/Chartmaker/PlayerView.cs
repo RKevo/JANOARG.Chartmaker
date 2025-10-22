@@ -5,18 +5,22 @@ using System.IO;
 using JANOARG.Chartmaker.Data.Chartmaker;
 using JANOARG.Chartmaker.Data.Chartmaker.Actions;
 using JANOARG.Chartmaker.UI.Cursor;
+using JANOARG.Chartmaker.UI.Modal;
 using JANOARG.Chartmaker.UI.NativeUI;
 using JANOARG.Shared.Data.ChartInfo;
 using JANOARG.Chartmaker.Utils;
+using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using JANOARG.Chartmaker.Behaviors.Chartmaker.PickHandler;
 
 namespace JANOARG.Chartmaker.Behaviors.Chartmaker
 {
     public class PlayerView : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IPointerMoveHandler, IDragHandler, IEndDragHandler
     {
-        public static PlayerView main;
+        public static PlayerView    main;
+        public RectTransform playerViewBound;
 
         public Camera MainCamera;
         public Image  BoundingBox;
@@ -67,7 +71,44 @@ namespace JANOARG.Chartmaker.Behaviors.Chartmaker
         [Space]
         public float[] GridSize = {0.5f};
 
-        float CurrentTime;
+        public float CurrentTime { get; private set; }
+
+        public bool IsMaximised
+        {
+            get
+            {
+                return
+                    HierarchyPanel.main.IsCollapsed
+                    && InspectorPanel.main.IsCollapsed
+                    && TimelinePanel.main.TimelineHeight <= 0
+                ;
+            }
+            set
+            {
+                if (value)
+                {
+                    if (!HierarchyPanel.main.IsCollapsed)
+                        HierarchyPanel.main.Collapse();
+
+                    if (!InspectorPanel.main.IsCollapsed)
+                        InspectorPanel.main.Collapse();
+
+                    if (TimelinePanel.main.TimelineHeight > 0)
+                        TimelinePanel.main.Collapse();
+                }
+                else
+                {
+                    if (HierarchyPanel.main.IsCollapsed)
+                        HierarchyPanel.main.Restore();
+
+                    if (InspectorPanel.main.IsCollapsed)
+                        InspectorPanel.main.Restore();
+
+                    if (TimelinePanel.main.TimelineHeight <= 0)
+                        TimelinePanel.main.Restore();
+                }
+            }
+        }
     
         int[] HitObjectsRemaining = new [] { 0, 0 };
         int   FlicksRemaining     = 0;
@@ -174,7 +215,7 @@ namespace JANOARG.Chartmaker.Behaviors.Chartmaker
                         pos:   InformationBar.main.beat
                     );
                 else 
-                    Manager.Update(InformationBar.main.sec, InformationBar.main.beat);
+                    Manager!.Update(InformationBar.main.sec, InformationBar.main.beat);
             
                 MainCamera.transform.position = Manager.Camera.CameraPivot;
                 MainCamera.transform.eulerAngles = Manager.Camera.CameraRotation; 
@@ -544,12 +585,14 @@ namespace JANOARG.Chartmaker.Behaviors.Chartmaker
                 ArrowFlickIndicator = mesh;
             }
         }
-
+        float holdDurationThreshold = 0.8f;
+        
         public void OnPointerDown(PointerEventData eventData)
         {
             if (isAnimating) return;
 
-            bool Contains(RectTransform rt) => rt.gameObject.activeInHierarchy && RectTransformUtility.RectangleContainsScreenPoint(rt, eventData.pressPosition, eventData.pressEventCamera);
+            bool Contains(RectTransform rt) =>
+                rt.gameObject.activeInHierarchy && RectTransformUtility.RectangleContainsScreenPoint(rt, eventData.pressPosition, eventData.pressEventCamera);
 
             CurrentDragMode = HandleDragMode.None;
 
@@ -564,7 +607,24 @@ namespace JANOARG.Chartmaker.Behaviors.Chartmaker
             else if (HierarchyPanel.main.CurrentMode == HierarchyMode.PlayableSong)
                 CurrentDragMode = HandleDragMode.Background;
 
-            if (CurrentDragMode == HandleDragMode.None) return;
+            if (CurrentDragMode == HandleDragMode.None)
+            {
+                if (HierarchyPanel.main.CurrentMode == HierarchyMode.Chart)
+                {
+                    Ray ray = MainCamera.ScreenPointToRay(eventData.position);
+                    RaycastHit[] raycastHits = Physics.RaycastAll(ray, 1000, -1, QueryTriggerInteraction.Collide);
+                    Array.Sort(raycastHits, (x, y) => x.distance.CompareTo(y.distance));
+                    foreach (RaycastHit raycastHit in raycastHits)
+                    {
+                        PlayerViewPickHandler pickHandler = raycastHit.collider.GetComponent<PlayerViewPickHandler>();
+                       
+                        if (pickHandler && pickHandler.Pick()) 
+                            break;
+                    }
+                }
+
+                return;
+            }
 
             if (HierarchyPanel.main.CurrentMode == HierarchyMode.PlayableSong && CurrentDragMode == HandleDragMode.Background)
             {
@@ -602,8 +662,8 @@ namespace JANOARG.Chartmaker.Behaviors.Chartmaker
                     if (index < 0) return;
                     LaneManager laneManager = Manager.Lanes[index];
                     LaneGroupManager laneGroupManager = null;
-                    bool hasGroup = !string.IsNullOrEmpty(laneManager.CurrentLane.Group) 
-                                    && Manager.Groups.TryGetValue(laneManager.CurrentLane.Group, out laneGroupManager);
+                    bool hasGroup = !string.IsNullOrEmpty(laneManager.Current.Group) 
+                                    && Manager.Groups.TryGetValue(laneManager.Current.Group, out laneGroupManager);
                 
                     Vector3 Inv(Vector3 x)      => Quaternion.Inverse(laneManager.FinalRotation) * (x - laneManager.FinalPosition);
                     Vector3 GroupInv(Vector3 x) => hasGroup ? Quaternion.Inverse(laneGroupManager.FinalRotation) * (x - laneGroupManager.FinalPosition) : x;
@@ -751,9 +811,9 @@ namespace JANOARG.Chartmaker.Behaviors.Chartmaker
 
                     Func<Vector3> get = CurrentDragMode switch
                     {
-                        HandleDragMode.Start => (() => Vector3.right * hitObjectManager.CurrentHit.Position),
-                        HandleDragMode.Center => (() => Vector3.right * (hitObjectManager.CurrentHit.Position + hitObjectManager.CurrentHit.Length / 2)),
-                        HandleDragMode.End => (() => Vector3.right * (hitObjectManager.CurrentHit.Position + hitObjectManager.CurrentHit.Length)),
+                        HandleDragMode.Start => (() => Vector3.right * hitObjectManager.Current.Position),
+                        HandleDragMode.Center => (() => Vector3.right * (hitObjectManager.Current.Position + hitObjectManager.Current.Length / 2)),
+                        HandleDragMode.End => (() => Vector3.right * (hitObjectManager.Current.Position + hitObjectManager.Current.Length)),
                         _ => null
                     };
                     
