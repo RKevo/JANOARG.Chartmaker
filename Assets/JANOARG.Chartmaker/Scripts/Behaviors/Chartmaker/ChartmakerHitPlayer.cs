@@ -30,14 +30,14 @@ namespace JANOARG.Chartmaker.Behaviors.Chartmaker
             transform.localRotation = hit.Rotation;
 
             var styles = PlayerView.main.Manager.PalleteManager.HitStyles;
-            int index = hit.Current.StyleIndex;
+            int index = hit.CurrentHit.StyleIndex;
             bool visible = index >= 0 && index < styles.Count;
 
             Material material = null, mainMaterial;
             mainMaterial = visible 
                 ? styles[index].NormalMaterial : null;
 
-            switch (hit.Current.Type)
+            switch (hit.CurrentHit.Type)
             {
                 case HitObject.HitType.Normal:
                     Renderer.transform.localScale = new (hit.Length - .5f, .5f, .5f);
@@ -95,7 +95,7 @@ namespace JANOARG.Chartmaker.Behaviors.Chartmaker
                 } 
             }
 
-            if (hit.Current.Flickable) 
+            if (hit.CurrentHit.Flickable) 
             { 
                 if (!FlickEmblem) {
                     FlickEmblem = Instantiate(PlayerView.main.HoldMeshSample, transform);
@@ -104,13 +104,13 @@ namespace JANOARG.Chartmaker.Behaviors.Chartmaker
                 FlickEmblem.sharedMaterial = mainMaterial;
                 FlickEmblem.transform.eulerAngles = PlayerView.main.MainCamera.transform.eulerAngles;
             
-                bool directional = float.IsFinite(hit.Current.FlickDirection);
+                bool directional = float.IsFinite(hit.CurrentHit.FlickDirection);
             
                 FlickEmblem.GetComponent<MeshFilter>().sharedMesh = directional 
                     ? PlayerView.main.ArrowFlickIndicator : PlayerView.main.FreeFlickIndicator;
             
                 if (directional) 
-                    FlickEmblem.transform.Rotate(Vector3.back * hit.Current.FlickDirection);
+                    FlickEmblem.transform.Rotate(Vector3.back * hit.CurrentHit.FlickDirection);
                 else
                     FlickEmblem.transform.Rotate(Vector3.forward * Vector2.SignedAngle(Vector2.right, camEnd - camStart));
             }

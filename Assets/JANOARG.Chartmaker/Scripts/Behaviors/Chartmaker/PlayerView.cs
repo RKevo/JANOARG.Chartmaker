@@ -662,8 +662,8 @@ namespace JANOARG.Chartmaker.Behaviors.Chartmaker
                     if (index < 0) return;
                     LaneManager laneManager = Manager.Lanes[index];
                     LaneGroupManager laneGroupManager = null;
-                    bool hasGroup = !string.IsNullOrEmpty(laneManager.Current.Group) 
-                                    && Manager.Groups.TryGetValue(laneManager.Current.Group, out laneGroupManager);
+                    bool hasGroup = !string.IsNullOrEmpty(laneManager.CurrentLane.Group) 
+                                    && Manager.Groups.TryGetValue(laneManager.CurrentLane.Group, out laneGroupManager);
                 
                     Vector3 Inv(Vector3 x)      => Quaternion.Inverse(laneManager.FinalRotation) * (x - laneManager.FinalPosition);
                     Vector3 GroupInv(Vector3 x) => hasGroup ? Quaternion.Inverse(laneGroupManager.FinalRotation) * (x - laneGroupManager.FinalPosition) : x;
@@ -811,9 +811,9 @@ namespace JANOARG.Chartmaker.Behaviors.Chartmaker
 
                     Func<Vector3> get = CurrentDragMode switch
                     {
-                        HandleDragMode.Start => (() => Vector3.right * hitObjectManager.Current.Position),
-                        HandleDragMode.Center => (() => Vector3.right * (hitObjectManager.Current.Position + hitObjectManager.Current.Length / 2)),
-                        HandleDragMode.End => (() => Vector3.right * (hitObjectManager.Current.Position + hitObjectManager.Current.Length)),
+                        HandleDragMode.Start => (() => Vector3.right * hitObjectManager.CurrentHit.Position),
+                        HandleDragMode.Center => (() => Vector3.right * (hitObjectManager.CurrentHit.Position + hitObjectManager.CurrentHit.Length / 2)),
+                        HandleDragMode.End => (() => Vector3.right * (hitObjectManager.CurrentHit.Position + hitObjectManager.CurrentHit.Length)),
                         _ => null
                     };
                     
